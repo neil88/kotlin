@@ -12,8 +12,10 @@ import com.intellij.testFramework.UsefulTestCase
 import org.jetbrains.kotlin.idea.perf.util.*
 import org.jetbrains.kotlin.idea.testFramework.ProjectOpenAction
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners
+import org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -51,7 +53,7 @@ class HighlightWholeProjectPerformanceTest : UsefulTestCase() {
         future =
             heapDumpThreadService.scheduleAtFixedRate(
                 {
-                    //HeapDumper.dumpHeap("HighlightWholeProjectPerformanceTest")
+                    HeapDumper.dumpHeap("HighlightWholeProjectPerformanceTest")
                 }, 2, 60, TimeUnit.MINUTES
             )
     }
@@ -125,8 +127,13 @@ class HighlightWholeProjectPerformanceTest : UsefulTestCase() {
 
     private fun handle(e: Throwable) {
         when (e) {
+            is RuntimeException, is ExecutionException -> e.cause?.let { handle(it) }
             is Exception -> return // nothing as it is already caught by perfTest
             is NoClassDefFoundError -> return // nothing as it is already caught by perfTest
+            is OutOfMemoryError -> {
+                HeapDumper.dumpHeap("HighlightWholeProjectPerformanceTest-OOM")
+                throw e
+            }
             else -> throw e
         }
     }
