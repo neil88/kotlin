@@ -124,7 +124,7 @@ projectTest(taskName = "wholeProjectsPerformanceTest") {
 
     jvmArgs?.removeAll { it.startsWith("-Xmx") }
 
-    maxHeapSize = "3g"
+    maxHeapSize = "6g"
     jvmArgs("-DperformanceProjects=${System.getProperty("performanceProjects")}")
     jvmArgs("-Didea.debug.mode=true")
     jvmArgs("-DemptyProfile=${System.getProperty("emptyProfile")}")
