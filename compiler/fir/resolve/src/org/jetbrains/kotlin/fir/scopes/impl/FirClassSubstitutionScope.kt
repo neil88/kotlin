@@ -6,9 +6,11 @@
 package org.jetbrains.kotlin.fir.scopes.impl
 
 import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.fir.FirEffectiveVisibilityImpl
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.builder.*
+import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticProperty
 import org.jetbrains.kotlin.fir.declarations.synthetic.buildSyntheticProperty
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
@@ -276,6 +278,7 @@ class FirClassSubstitutionScope(
 
     companion object {
         private fun FirFunctionBuilder.configureAnnotationsAndParameters(
+            session: FirSession,
             baseFunction: FirFunction<*>,
             newParameterTypes: List<ConeKotlinType?>?
         ) {
@@ -309,6 +312,7 @@ class FirClassSubstitutionScope(
         ): FirSimpleFunction {
             // TODO: consider using here some light-weight functions instead of pseudo-real FirMemberFunctionImpl
             // As second alternative, we can invent some light-weight kind of FirRegularClass
+            val isLocal = fakeOverrideSymbol.callableId.classId?.isLocal == true
             return buildSimpleFunction {
                 source = baseFunction.source
                 this.session = session
@@ -316,10 +320,16 @@ class FirClassSubstitutionScope(
                 returnTypeRef = baseFunction.returnTypeRef.withReplacedReturnType(newReturnType)
                 receiverTypeRef = baseFunction.receiverTypeRef?.withReplacedConeType(newReceiverType)
                 name = baseFunction.name
-                status = baseFunction.status
+                status = baseFunction.status.let {
+                    if (isLocal && it is FirDeclarationStatusImpl) {
+                        it.resolved(it.visibility, FirEffectiveVisibilityImpl.Local, it.modality!!)
+                    } else {
+                        it
+                    }
+                }
                 symbol = fakeOverrideSymbol
                 resolvePhase = baseFunction.resolvePhase
-                configureAnnotationsAndParameters(baseFunction, newParameterTypes)
+                configureAnnotationsAndParameters(session, baseFunction, newParameterTypes)
 
                 // TODO: Fix the hack for org.jetbrains.kotlin.fir.backend.Fir2IrVisitor.addFakeOverrides
                 // We might have added baseFunction.typeParameters in case new ones are null
@@ -375,7 +385,13 @@ class FirClassSubstitutionScope(
                 isVar = baseProperty.isVar
                 this.symbol = symbol
                 isLocal = false
-                status = baseProperty.status
+                status = baseProperty.status.let {
+                    if (isLocal && it is FirDeclarationStatusImpl) {
+                        it.resolved(it.visibility, FirEffectiveVisibilityImpl.Local, it.modality!!)
+                    } else {
+                        it
+                    }
+                }
                 resolvePhase = baseProperty.resolvePhase
                 annotations += baseProperty.annotations
                 if (newTypeParameters != null) {
@@ -448,7 +464,7 @@ class FirClassSubstitutionScope(
                 status = baseConstructor.status
                 symbol = fakeOverrideSymbol
                 resolvePhase = baseConstructor.resolvePhase
-                configureAnnotationsAndParameters(baseConstructor, newParameterTypes)
+                configureAnnotationsAndParameters(session, baseConstructor, newParameterTypes)
 
                 // TODO: Fix the hack for org.jetbrains.kotlin.fir.backend.Fir2IrVisitor.addFakeOverrides
                 // We might have added baseFunction.typeParameters in case new ones are null
