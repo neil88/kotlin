@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.idea.perf
 
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPassFactory
+import com.intellij.codeInsight.hints.InlayHintsSettings
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInspection.InspectionProfileEntry
 import com.intellij.openapi.actionSystem.IdeActions
@@ -26,6 +27,8 @@ import com.intellij.util.ArrayUtilRt
 import com.intellij.util.ThrowableRunnable
 import com.intellij.util.indexing.UnindexedFilesUpdater
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.idea.codeInsight.codevision.KotlinCodeVisionProvider
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.perf.Stats.Companion.WARM_UP
 import org.jetbrains.kotlin.idea.perf.Stats.Companion.runAndMeasure
@@ -50,9 +53,23 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
     private lateinit var jdk18: Sdk
     private lateinit var myApplication: TestApplicationManager
 
+    companion object {
+        private fun enabledCodeVision() {
+            val codeVisionProvider = KotlinCodeVisionProvider()
+            val settings = codeVisionProvider.createSettings().apply {
+                showUsages = true
+                showInheritors = true
+            }
+
+            @Suppress("UnstableApiUsage")
+            InlayHintsSettings.instance().storeSettings(codeVisionProvider.key, KotlinLanguage.INSTANCE, settings)
+        }
+    }
+
     override fun isStressTest(): Boolean = true
 
     override fun isPerformanceTest(): Boolean = false
+
 
     override fun setUp() {
         super.setUp()
@@ -198,6 +215,8 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
                     lastProject = project
                     openAction.postOpenProject(openProject = openProject, project = project)
                     project.initDefaultProfile()
+
+                    enabledCodeVision()
 
                     logMessage { "project '$name' successfully opened" }
 
