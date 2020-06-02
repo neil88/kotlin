@@ -151,6 +151,7 @@ internal fun KtDeclaration.getKotlinType(): KotlinType? {
 
 internal fun KtDeclaration.resolve() = LightClassGenerationSupport.getInstance(project).resolveToDescriptor(this)
 internal fun KtElement.analyze() = LightClassGenerationSupport.getInstance(project).analyze(this)
+internal fun KtDeclaration.analyzeToDescriptor() = LightClassGenerationSupport.getInstance(project).analyzeToDescriptor(this)
 
 // copy-pasted from kotlinInternalUastUtils.kt and post-processed
 internal fun KotlinType.asPsiType(
@@ -317,7 +318,7 @@ internal fun KtModifierListOwner.isHiddenByDeprecation(support: KtUltraLightSupp
 }
 
 internal fun KtAnnotated.isJvmStatic(support: KtUltraLightSupport): Boolean =
-    support.findAnnotation(this, JVM_STATIC_ANNOTATION_FQ_NAME) !== null
+    support.hasAnnotation(this, JVM_STATIC_ANNOTATION_FQ_NAME)
 
 internal fun KtDeclaration.simpleVisibility(): String = when {
     hasModifier(KtTokens.PRIVATE_KEYWORD) -> PsiModifier.PRIVATE
@@ -344,7 +345,7 @@ internal fun KtModifierListOwner.isDeprecated(support: KtUltraLightSupport? = nu
         if (deprecatedName == fqName.asString()) return true
     }
 
-    return support?.findAnnotation(this, KotlinBuiltIns.FQ_NAMES.deprecated) !== null
+    return support?.hasAnnotation(this, KotlinBuiltIns.FQ_NAMES.deprecated) ?: false
 }
 
 private fun toQualifiedName(userType: KtUserType): FqName? {
