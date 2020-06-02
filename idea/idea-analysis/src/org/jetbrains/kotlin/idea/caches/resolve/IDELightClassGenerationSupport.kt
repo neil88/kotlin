@@ -29,6 +29,8 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.idea.caches.lightClasses.IDELightClassContexts
 import org.jetbrains.kotlin.idea.caches.lightClasses.LazyLightClassDataHolder
+import org.jetbrains.kotlin.idea.caches.resolve.util.AnnotationLightResolver
+import org.jetbrains.kotlin.idea.caches.resolve.util.SearchResult
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.resolve.frontendService
 import org.jetbrains.kotlin.idea.stubindex.KotlinTypeAliasShortNameIndex
@@ -66,7 +68,7 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
                 it.shortName == fqName.shortName() || owner.containingKtFile.hasAlias(it.shortName)
             }
             for (entry in candidates) {
-                val descriptor = analyze(entry).get(BindingContext.ANNOTATION, entry)
+                val descriptor = entry.analyze(BodyResolveMode.PARTIAL).get(BindingContext.ANNOTATION, entry)
                 if (descriptor?.fqName == fqName) {
                     return Pair(entry, descriptor)
                 }
@@ -91,7 +93,6 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         }
 
         override val deprecationResolver: DeprecationResolver get() = resolutionFacade.getFrontendService(DeprecationResolver::class.java)
-
 
         override val typeMapper: KotlinTypeMapper by lazyPub {
             KotlinTypeMapper(
@@ -155,14 +156,6 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         return allAliases(this)[shortName.asString()] == true
     }
 
-    private fun allAliases(file: KtFile): ConcurrentMap<String, Boolean> = CachedValuesManager.getCachedValue(file) {
-        val importAliases = file.importDirectives.mapNotNull { it.aliasName }.toSet()
-        val map = ConcurrentFactoryMap.createMap<String, Boolean> { s ->
-            s in importAliases || KotlinTypeAliasShortNameIndex.getInstance().get(s, project, file.resolveScope).isNotEmpty()
-        }
-        CachedValueProvider.Result.create<ConcurrentMap<String, Boolean>>(map, PsiModificationTracker.MODIFICATION_COUNT)
-    }
-
     private val scopeFileComparator = JavaElementFinder.byClasspathComparator(GlobalSearchScope.allScope(project))
 
     override fun createDataHolderForClass(classOrObject: KtClassOrObject, builder: LightClassBuilder): LightClassDataHolder.ForClass {
@@ -219,4 +212,17 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
     override fun analyze(element: KtElement) = element.analyze(BodyResolveMode.PARTIAL)
 
     override fun analyzeWithContent(element: KtClassOrObject) = element.analyzeWithContent()
+}
+
+fun allAliases(file: KtFile): ConcurrentMap<String, Boolean> = CachedValuesManager.getCachedValue(file) {
+    val importAliases = file.importDirectives.mapNotNull { it.aliasName }.toSet()
+    val map = ConcurrentFactoryMap.createMap<String, Boolean> { s ->
+        if (s in importAliases) {
+            true
+        } else {
+            val typeAliases = KotlinTypeAliasShortNameIndex.getInstance().get(s, file.project, file.resolveScope)
+            typeAliases.isNotEmpty()
+        }
+    }
+    CachedValueProvider.Result.create<ConcurrentMap<String, Boolean>>(map, PsiModificationTracker.MODIFICATION_COUNT)
 }

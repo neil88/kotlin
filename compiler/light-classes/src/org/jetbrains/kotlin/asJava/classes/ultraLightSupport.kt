@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtAnnotated
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
-import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 
 interface KtUltraLightSupport {

@@ -43,7 +43,7 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.isAnyOrNullableAny
 import java.util.concurrent.ConcurrentHashMap
 
-open class KtUltraLightClass(classOrObject: KtClassOrObject, internal val support: KtUltraLightSupport) :
+open class KtUltraLightClass(classOrObject: KtClassOrObject, val support: KtUltraLightSupport) :
     KtLightClassImpl(classOrObject) {
 
     private class KtUltraLightClassModifierList(
@@ -420,8 +420,8 @@ open class KtUltraLightClass(classOrObject: KtClassOrObject, internal val suppor
             methodIndex
         )
 
-    private fun isHiddenByDeprecation(declaration: KtDeclaration): Boolean {
-        val deprecated = support.findAnnotation(declaration, FqName("kotlin.Deprecated"))?.second
+    fun isHiddenByDeprecation(declaration: KtDeclaration): Boolean {
+        val deprecated = support.findAnnotation(declaration, KotlinBuiltIns.FQ_NAMES.deprecated)?.second
         return (deprecated?.argumentValue("level") as? EnumValue)?.enumEntryName?.asString() == "HIDDEN"
     }
 
