@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.idea.perf
 
+import com.intellij.codeHighlighting.Pass
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.testFramework.UsefulTestCase
 import org.jetbrains.kotlin.idea.perf.util.ExternalProject
@@ -54,8 +55,8 @@ class AHeavyInspectionsPerformanceTest : UsefulTestCase() {
 
     fun testUnusedSymbolLocalInspection() {
         suite {
-            config.warmup = 1
-            config.iterations = 2
+            config.warmup = 2
+            config.iterations = 1
             config.profilerConfig.enabled = true
             config.profilerConfig.tracing = true
             app {
@@ -67,7 +68,9 @@ class AHeavyInspectionsPerformanceTest : UsefulTestCase() {
 
                             measure<List<HighlightInfo>>(inspection, file.lastPathSegment()) {
                                 test = {
-                                    highlight(editorFile)
+                                    val passesToIgnore =
+                                        ((1 until Pass.LOCAL_INSPECTIONS) + (Pass.LOCAL_INSPECTIONS + 1 until Pass.WHOLE_FILE_LOCAL_INSPECTIONS) + (Pass.WHOLE_FILE_LOCAL_INSPECTIONS + 1 until 100)).toIntArray()
+                                    editorFile.highlightIt(passesToIgnore)
                                 }
                             }
                         }
