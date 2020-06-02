@@ -96,30 +96,39 @@ internal class ArrayMapImpl<T : Any> : ArrayMap<T>() {
 
     override fun iterator(): Iterator<T> {
         return object : Iterator<T> {
-            private var currentIndex = -1
-            private var nextIndex = 0
+            private var currentIndex: Int
+            private var nextIndex = -1
+            private var nextFounded = true
+
+            init {
+                for (i in data.indices) {
+                    if (data[i] != null) {
+                        nextIndex = i
+                        break
+                    }
+                }
+                currentIndex = nextIndex
+                nextFounded = true
+            }
 
             override fun hasNext(): Boolean {
-                if (nextIndex < 0) return false
-                while (nextIndex < data.size && data[nextIndex] == null) {
+                if (nextFounded) return nextIndex >= 0
+                do {
                     nextIndex++
-                }
-                return if (nextIndex >= data.size) {
+                } while (nextIndex < data.size && data[nextIndex] == null)
+                if (nextIndex >= data.size) {
                     nextIndex = -1
-                    false
-                } else {
-                    true
                 }
+                nextFounded = true
+                return nextIndex >= 0
             }
 
             override fun next(): T {
                 if (!hasNext()) throw NoSuchElementException()
-                if (currentIndex < 0) {
-                    currentIndex = nextIndex
-                }
                 @Suppress("UNCHECKED_CAST")
+                currentIndex = nextIndex
                 val result = data[currentIndex] as T
-                currentIndex = nextIndex++
+                nextFounded = false
                 return result
             }
         }
