@@ -9,8 +9,11 @@ import com.intellij.testFramework.LightProjectDescriptor
 import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.kotlin.asJava.LightClassUtil
+import org.jetbrains.kotlin.asJava.classes.KtUltraLightClass
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.asJava.toLightMethods
+import org.jetbrains.kotlin.idea.caches.resolve.IDELightClassGenerationSupport
+import org.jetbrains.kotlin.idea.stubindex.KotlinTypeAliasShortNameIndex
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 import org.jetbrains.kotlin.psi.*
@@ -46,6 +49,61 @@ class LightClassAccessorsTest : KotlinLightCodeInsightFixtureTestCase() {
         }
     }
 
+    fun testLightAnnotationResolver() { // rename to findDeprecated
+        val file = myFixture.configureByText(
+            "test.kt",
+            //language=kotlin
+            """
+            import org.junit.Test
+            import kotlin.Deprecated as Test1
+            import kotlin.Deprecated as D1
+            import D1 as D2
+            import org.D3 as NONEXIST
+        
+            class A { 
+                @NONEXIST
+                fun testFalse3() {}
+
+                @D2
+                fun testFalse() {}
+
+                @org.junit.Test
+                fun testFalse1() {}
+
+                @Deprecated
+                fun testFalse2() {}
+                
+
+                @Test1(level = DeprecationLevel.HIDDEN)
+                fun testTrue() {}
+
+                @Deprecated(level = DeprecationLevel.HIDDEN)
+                fun testTrue1() {}
+                
+                @B(level = DeprecationLevel.HIDDEN)
+                fun testTrue2() {}
+                
+                @C(level = DeprecationLevel.HIDDEN)
+                fun testTrue3() {} 
+            }
+            
+            typealias B = Test1
+            typealias C = kotlin.Deprecated
+            """.trimIndent()
+        )
+        file.accept(namedDeclarationRecursiveVisitor { declaration ->
+            val classes = LightClassUtil.getWrappingClasses(declaration)
+            for (clazz in classes) {
+                if (clazz is KtUltraLightClass) {
+                    val hidden = clazz.isHiddenByDeprecation(declaration)
+                    if (declaration.nameAsSafeName.asString().contains("testTruth"))
+                        assertThat(hidden).describedAs(declaration.text).isTrue()
+                    else if (declaration.nameAsSafeName.asString().contains("testFalse"))
+                        assertThat(hidden).describedAs(declaration.text).isFalse()
+                }
+            }
+        })
+    }
 
     override fun getProjectDescriptor(): LightProjectDescriptor {
         return KotlinWithJdkAndRuntimeLightProjectDescriptor.INSTANCE
