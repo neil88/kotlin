@@ -207,6 +207,14 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         }
     }
 
+    override fun analyzeToDescriptor(declaration: KtDeclaration): DeclarationDescriptor? {
+        return try {
+            declaration.resolveToDescriptorIfAny(BodyResolveMode.PARTIAL)
+        } catch (e: NoDescriptorForDeclarationException) {
+            null
+        }
+    }
+
     override fun analyze(element: KtElement) = element.analyze(BodyResolveMode.PARTIAL)
 
     override fun analyzeWithContent(element: KtClassOrObject) = element.analyzeWithContent()
