@@ -386,7 +386,7 @@ internal class UltraLightMembersCreator(
         return isInternalNonPublishedApi(containingProperty)
     }
 
-    private fun KtAnnotated.hasAnnotation(name: FqName) = support.findAnnotation(this, name) != null
+    private fun KtAnnotated.hasAnnotation(name: FqName) = support.hasAnnotation(this, name)
 
     private fun isInternal(f: KtDeclaration): Boolean {
         if (f.hasModifier(OVERRIDE_KEYWORD)) {

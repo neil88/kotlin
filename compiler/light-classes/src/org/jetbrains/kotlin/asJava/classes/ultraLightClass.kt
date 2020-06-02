@@ -420,16 +420,13 @@ open class KtUltraLightClass(classOrObject: KtClassOrObject, val support: KtUltr
             methodIndex
         )
 
-    fun isHiddenByDeprecation(declaration: KtDeclaration): Boolean {
-        val deprecated = support.findAnnotation(declaration, KotlinBuiltIns.FQ_NAMES.deprecated)?.second
-        return (deprecated?.argumentValue("level") as? EnumValue)?.enumEntryName?.asString() == "HIDDEN"
-    }
+    fun isHiddenByDeprecation(declaration: KtDeclaration) = support.isHiddenByDeprecation(declaration)
 
     private fun isJvmStatic(declaration: KtAnnotated): Boolean = declaration.hasAnnotation(JVM_STATIC_ANNOTATION_FQ_NAME)
 
     override fun getOwnMethods(): List<KtLightMethod> = _ownMethods.value
 
-    private fun KtAnnotated.hasAnnotation(name: FqName) = support.findAnnotation(this, name) != null
+    private fun KtAnnotated.hasAnnotation(name: FqName) = support.hasAnnotation(this, name)
 
     private fun KtCallableDeclaration.isConstOrJvmField() =
         hasModifier(CONST_KEYWORD) || isJvmField()

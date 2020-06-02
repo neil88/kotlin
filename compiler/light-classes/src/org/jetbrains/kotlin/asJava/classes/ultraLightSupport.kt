@@ -26,6 +26,8 @@ interface KtUltraLightSupport {
     val moduleDescriptor: ModuleDescriptor
     val isReleasedCoroutine: Boolean
 
+    fun hasAnnotation(owner: KtAnnotated, fqName: FqName) = findAnnotation(owner, fqName) !== null
+
     fun isHiddenByDeprecation(owner: KtModifierListOwner): Boolean {
         val deprecated = findAnnotation(owner, KotlinBuiltIns.FQ_NAMES.deprecated)?.second
         return (deprecated?.argumentValue("level") as? EnumValue)?.enumEntryName?.asString() == "HIDDEN"
