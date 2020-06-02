@@ -274,6 +274,13 @@ public class KtPsiUtil {
     ) {
         if (element instanceof PsiFile) return null;
 
+        if (element instanceof KtAnnotationEntry) {
+            for (Class<? extends PsiElement> clazz : parentTypes) {
+                if (clazz.getCanonicalName().equalsIgnoreCase("org.jetbrains.kotlin.psi.KtAnnotationEntry"))
+                    return null;
+            }
+        }
+
         PsiElement answer = PsiTreeUtil.getParentOfType(element, parentTypes);
         if (answer instanceof PsiFile) return answer;
 
