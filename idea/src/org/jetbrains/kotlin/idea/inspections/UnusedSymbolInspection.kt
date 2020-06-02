@@ -19,10 +19,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiElementVisitor
-import com.intellij.psi.PsiReference
+import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.PsiSearchHelper.SearchCostResult
@@ -31,8 +28,10 @@ import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.searches.DefinitionsScopedSearch
 import com.intellij.psi.search.searches.MethodReferencesSearch
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.TypeConversionUtil
 import com.intellij.refactoring.safeDelete.SafeDeleteHandler
 import com.intellij.util.Processor
+import org.jetbrains.annotations.NonNls
 import org.jetbrains.kotlin.asJava.LightClassUtil
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
 import org.jetbrains.kotlin.asJava.toLightClass
@@ -63,7 +62,9 @@ import org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearchOpt
 import org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearchParameters
 import org.jetbrains.kotlin.idea.search.isCheapEnoughToSearchConsideringOperators
 import org.jetbrains.kotlin.idea.search.projectScope
-import org.jetbrains.kotlin.idea.search.usagesSearch.*
+import org.jetbrains.kotlin.idea.search.usagesSearch.getAccessorNames
+import org.jetbrains.kotlin.idea.search.usagesSearch.getClassNameForCompanionObject
+import org.jetbrains.kotlin.idea.search.usagesSearch.isDataClassProperty
 import org.jetbrains.kotlin.idea.stubindex.KotlinSourceFilterScope
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
 import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
@@ -136,7 +137,7 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
 
             if (isCheapEnough.value == TOO_MANY_OCCURRENCES) return false
 
-            return javaInspection.isEntryPoint(lightElement)
+            return false && javaInspection.isEntryPoint(lightElement)
         }
 
         private fun isCheapEnoughToSearchUsages(declaration: KtNamedDeclaration): SearchCostResult {
@@ -227,7 +228,50 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
         }
 
         private fun KtNamedFunction.isSerializationImplicitlyUsedMethod(): Boolean =
-            toLightMethods().any { JavaHighlightUtil.isSerializationRelatedMethod(it, it.containingClass) }
+            toLightMethods().any { isSerializationRelatedMethod(it, it.containingClass) }
+
+
+        fun isSerializationRelatedMethod(method: PsiMethod, containingClass: PsiClass?): Boolean {
+            if (containingClass == null) return false
+            if (method.isConstructor) {
+                return if (JavaHighlightUtil.isSerializable(containingClass, "java.io.Externalizable") &&
+                    method.parameterList.isEmpty &&
+                    method.hasModifierProperty(PsiModifier.PUBLIC)
+                ) {
+                    true
+                } else false
+            }
+            if (method.hasModifierProperty(PsiModifier.STATIC)) return false
+            @NonNls val name = method.name
+            val parameters = method.parameterList.parameters
+            if ("readObjectNoData" == name) {
+                val returnType = method.returnType
+                return parameters.size == 0 && TypeConversionUtil.isVoidType(returnType) && JavaHighlightUtil.isSerializable(containingClass)
+            }
+            if ("readObject" == name) {
+                val returnType = method.returnType
+                return (parameters.size == 1 && parameters[0].type.equalsToText("java.io.ObjectInputStream")
+                        && TypeConversionUtil.isVoidType(returnType) && method.hasModifierProperty(PsiModifier.PRIVATE)
+                        && JavaHighlightUtil.isSerializable(containingClass))
+            }
+            if ("readResolve" == name) {
+                val returnType = method.returnType
+                return (parameters.size == 0 && returnType != null && returnType.equalsToText(CommonClassNames.JAVA_LANG_OBJECT)
+                        && (containingClass.hasModifierProperty(PsiModifier.ABSTRACT) || JavaHighlightUtil.isSerializable(containingClass)))
+            }
+            if ("writeReplace" == name) {
+                val returnType = method.returnType
+                return (parameters.size == 0 && returnType != null && returnType.equalsToText(CommonClassNames.JAVA_LANG_OBJECT)
+                        && (containingClass.hasModifierProperty(PsiModifier.ABSTRACT) || JavaHighlightUtil.isSerializable(containingClass)))
+            }
+            return if ("writeObject" == name) {
+                val returnType = method.returnType // will lead to resolve if moved out
+                (parameters.size == 1 && TypeConversionUtil.isVoidType(returnType)
+                        && parameters[0].type.equalsToText("java.io.ObjectOutputStream")
+                        && method.hasModifierProperty(PsiModifier.PRIVATE)
+                        && JavaHighlightUtil.isSerializable(containingClass))
+            } else false
+        }
 
         // variation of IDEA's AnnotationUtil.checkAnnotatedUsingPatterns()
         fun checkAnnotatedUsingPatterns(
@@ -331,7 +375,11 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
         return hasNonTrivialUsages(declaration, isCheapEnough, descriptor)
     }
 
-    private fun hasNonTrivialUsages(declaration: KtNamedDeclaration, enoughToSearchUsages: Lazy<SearchCostResult>, descriptor: DeclarationDescriptor? = null): Boolean {
+    private fun hasNonTrivialUsages(
+        declaration: KtNamedDeclaration,
+        enoughToSearchUsages: Lazy<SearchCostResult>,
+        descriptor: DeclarationDescriptor? = null
+    ): Boolean {
         val project = declaration.project
         val psiSearchHelper = PsiSearchHelper.getInstance(project)
 
