@@ -61,9 +61,9 @@ class AHeavyInspectionsPerformanceTest : UsefulTestCase() {
             config.profilerConfig.tracing = true
             app {
                 project(ExternalProject.KOTLIN_AUTO) {
-                    for (inspection in listOfInspections.sliceArray(0..1)) {
+                    for (inspection in listOfInspections.sliceArray(0 until 1)) {
                         enableSingleInspection(inspection)
-                        for (file in listOfFiles.sliceArray(0..1)) {
+                        for (file in listOfFiles.sliceArray(0 until 1)) {
                             val editorFile = editor(file)
 
                             measure<List<HighlightInfo>>(inspection, file.lastPathSegment()) {

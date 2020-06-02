@@ -161,6 +161,13 @@ class PerformanceSuite {
         fun gradleProject(path: String, refresh: Boolean = false, block: ProjectScope.() -> Unit) =
             ProjectScope(ProjectScopeConfig(path, ProjectOpenAction.GRADLE_PROJECT, refresh), this).use(block)
 
+        fun PsiFile.highlightIt(toIgnore: IntArray): List<HighlightInfo> {
+            val document = FileDocumentManager.getInstance().getDocument(virtualFile)!!
+            val editor = EditorFactory.getInstance().getEditors(document).first()
+//            PsiDocumentManager.getInstance(project).commitAllDocuments()
+            return CodeInsightTestFixtureImpl.instantiateAndRun(this, editor, toIgnore, false)
+        }
+
         fun warmUpProject() = project {
             descriptor {
                 name("helloWorld")
@@ -321,7 +328,7 @@ class PerformanceSuite {
 
         fun <T> measure(vararg name: String, f: MeasurementScope<T>.() -> Unit): List<T?> {
             val after = { PsiManager.getInstance(project).dropPsiCaches() }
-            return app.stats.measure("${name.joinToString("-")}", f, after)
+            return app.stats.measure(name.joinToString("-"), f, after)
         }
 
         fun <T> measure(vararg name: String, fixture: Fixture, f: MeasurementScope<T>.() -> Unit): List<T?> =
