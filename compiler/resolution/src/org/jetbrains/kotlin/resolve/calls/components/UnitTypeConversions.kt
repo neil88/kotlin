@@ -53,6 +53,8 @@ object UnitTypeConversions : ParameterTypeConversion {
             suspendFunction = expectedParameterType.isSuspendFunctionType
         )
 
+        candidate.resolvedCall.registerArgumentWithUnitConversion(argument, nonUnitReturnedParameterType)
+
         candidate.addDiagnostic(LowerPriorityToPreserveCompatibility)
 
         return nonUnitReturnedParameterType
