@@ -29,8 +29,6 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.idea.caches.lightClasses.IDELightClassContexts
 import org.jetbrains.kotlin.idea.caches.lightClasses.LazyLightClassDataHolder
-import org.jetbrains.kotlin.idea.caches.resolve.util.AnnotationLightResolver
-import org.jetbrains.kotlin.idea.caches.resolve.util.SearchResult
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.resolve.frontendService
 import org.jetbrains.kotlin.idea.stubindex.KotlinTypeAliasShortNameIndex
@@ -68,7 +66,7 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
                 it.shortName == fqName.shortName() || owner.containingKtFile.hasAlias(it.shortName)
             }
             for (entry in candidates) {
-                val descriptor = entry.analyze(BodyResolveMode.PARTIAL).get(BindingContext.ANNOTATION, entry)
+                val descriptor = analyze(entry).get(BindingContext.ANNOTATION, entry)
                 if (descriptor?.fqName == fqName) {
                     return Pair(entry, descriptor)
                 }
