@@ -264,7 +264,7 @@ open class KtUltraLightClass(classOrObject: KtClassOrObject, val support: KtUltr
     private fun ownMethods(): List<KtLightMethod> {
         val result = mutableListOf<KtLightMethod>()
 
-        for (declaration in this.classOrObject.declarations.filterNot { it.isHiddenByDeprecation(support) }) {
+        for (declaration in this.classOrObject.declarations) {
             if (declaration.hasModifier(PRIVATE_KEYWORD) && isInterface) continue
             getAccessors(declaration)?.let { result.addAll(it) }
         }

@@ -63,8 +63,7 @@ fun KtUltraLightClass.isNewHiddenByDeprecation(declaration: KtDeclaration): Bool
             return false
         }
         else -> {
-            val deprecated = support.findAnnotation(declaration, KotlinBuiltIns.FQ_NAMES.deprecated)?.second
-            (deprecated?.argumentValue("level") as? EnumValue)?.enumEntryName?.asString() == "HIDDEN"
+            support.isHiddenByDeprecation(declaration)
         }
     }
 }
