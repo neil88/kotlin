@@ -14,12 +14,14 @@ import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection
 import com.intellij.codeInspection.ex.EntryPointsManager
 import com.intellij.codeInspection.ex.EntryPointsManagerBase
 import com.intellij.codeInspection.ex.EntryPointsManagerImpl
+import com.intellij.codeInspection.reference.RefUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.*
+import com.intellij.psi.impl.PsiClassImplUtil
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.PsiSearchHelper.SearchCostResult
@@ -28,8 +30,12 @@ import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.searches.DefinitionsScopedSearch
 import com.intellij.psi.search.searches.MethodReferencesSearch
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.MethodSignature
+import com.intellij.psi.util.MethodSignatureUtil
+import com.intellij.psi.util.PsiMethodUtil
 import com.intellij.psi.util.TypeConversionUtil
 import com.intellij.refactoring.safeDelete.SafeDeleteHandler
+import com.intellij.util.IncorrectOperationException
 import com.intellij.util.Processor
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.kotlin.asJava.LightClassUtil
@@ -94,7 +100,7 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
             UnusedSymbolInspection::class.java
         )
 
-        private val javaInspection = UnusedDeclarationInspection()
+        private val javaInspection = KtUnusedDeclarationInspection()
 
         private val KOTLIN_ADDITIONAL_ANNOTATIONS = listOf("kotlin.test.*", "kotlin.js.JsExport")
 
@@ -136,7 +142,7 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
 
             if (isCheapEnough.value == TOO_MANY_OCCURRENCES) return false
 
-            return false && javaInspection.isEntryPoint(lightElement)
+            return javaInspection.isEntryPoint(lightElement)
         }
 
         private fun isCheapEnoughToSearchUsages(declaration: KtNamedDeclaration): SearchCostResult {
@@ -687,4 +693,79 @@ class SafeDeleteFix(declaration: KtDeclaration) : LocalQuickFix {
 
 private fun safeDelete(project: Project, declaration: PsiElement) {
     SafeDeleteHandler.invoke(project, arrayOf(declaration), false)
+}
+
+class KtUnusedDeclarationInspection : UnusedDeclarationInspection() {
+    override fun isEntryPoint(element: PsiElement): Boolean {
+        val project = element.project
+        val psiFacade = JavaPsiFacade.getInstance(project)
+        if (element is PsiMethod && ADD_MAINS_TO_ENTRIES && isMainOrPremainMethod(element)) {
+            return true
+        }
+        if (element is PsiClass) {
+            val aClass = element
+            val applet = psiFacade.findClass("java.applet.Applet", GlobalSearchScope.allScope(project))
+            if (ADD_MAINS_TO_ENTRIES && applet != null && aClass.isInheritor(applet, true)) {
+                return true
+            }
+            val servlet = psiFacade.findClass("javax.servlet.Servlet", GlobalSearchScope.allScope(project))
+            if (ADD_MAINS_TO_ENTRIES && servlet != null && aClass.isInheritor(servlet, true)) {
+                return true
+            }
+            if (ADD_MAINS_TO_ENTRIES) {
+                if (hasMainMethodDeep(aClass)) return true
+            }
+        }
+        if (element is PsiModifierListOwner) {
+            val entryPointsManager = EntryPointsManager.getInstance(project)
+            if (entryPointsManager.isEntryPoint(element)) return true
+        }
+        for (extension in extensions) {
+            if (extension.isSelected && extension.isEntryPoint(element)) {
+                return true
+            }
+        }
+        return RefUtil.isImplicitUsage(element)
+    }
+
+    companion object {
+        val LOG = Logger.getInstance("#org.jetbrains.kotlin.idea.inspections.KtUnusedDeclarationInspection")
+
+        private fun hasMainMethodDeep(aClass: PsiClass): Boolean {
+            if (PsiMethodUtil.hasMainMethod(aClass)) return true
+            for (innerClass in aClass.innerClasses) {
+                if (innerClass.hasModifierProperty(PsiModifier.STATIC) && PsiMethodUtil.hasMainMethod(innerClass)) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        /** ex-PsiClassImplUtil */
+        fun isMainOrPremainMethod(method: PsiMethod): Boolean {
+            val name = method.name
+            if (!("main" == name || "premain" == name || "agentmain" == name)) return false
+            if (PsiType.VOID != method.returnType) return false
+            val factory = JavaPsiFacade.getElementFactory(method.project)
+            val signature = method.getSignature(PsiSubstitutor.EMPTY)
+            try {
+                val main = createSignatureFromText(factory, "void main(String[] args);")
+                if (MethodSignatureUtil.areSignaturesEqual(signature, main)) return true
+                val premain = createSignatureFromText(factory, "void premain(String args, java.lang.instrument.Instrumentation i);")
+                if (MethodSignatureUtil.areSignaturesEqual(signature, premain)) return true
+                val agentmain = createSignatureFromText(
+                    factory, "void agentmain(String args, java.lang.instrument.Instrumentation i);"
+                )
+                if (MethodSignatureUtil.areSignaturesEqual(signature, agentmain)) return true
+            } catch (e: IncorrectOperationException) {
+                LOG.error(e)
+            }
+            return false
+        }
+
+        private fun createSignatureFromText(factory: PsiElementFactory, text: String): MethodSignature {
+            return factory.createMethodFromText(text, null).getSignature(PsiSubstitutor.EMPTY)
+        }
+
+    }
 }
