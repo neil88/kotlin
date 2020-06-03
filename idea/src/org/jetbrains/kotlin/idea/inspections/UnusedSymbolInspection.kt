@@ -48,7 +48,6 @@ import org.jetbrains.kotlin.idea.core.script.configuration.DefaultScriptingSuppo
 import org.jetbrains.kotlin.idea.core.toDescriptor
 import org.jetbrains.kotlin.idea.findUsages.KotlinFindUsagesHandlerFactory
 import org.jetbrains.kotlin.idea.findUsages.handlers.KotlinFindClassUsagesHandler
-import org.jetbrains.kotlin.idea.imports.importableFqName
 import org.jetbrains.kotlin.idea.inspections.collections.isCalling
 import org.jetbrains.kotlin.idea.intentions.callExpression
 import org.jetbrains.kotlin.idea.intentions.isFinalizeMethod
@@ -641,9 +640,8 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
         list.add(SafeDeleteFix(declaration))
 
         for (annotationEntry in declaration.annotationEntries) {
-            val typeElement = annotationEntry.typeReference?.typeElement as? KtUserType ?: continue
-            val target = typeElement.referenceExpression?.resolveMainReferenceToDescriptors()?.singleOrNull() ?: continue
-            val fqName = target.importableFqName?.asString() ?: continue
+            val resolvedName = annotationEntry.resolveToDescriptorIfAny() ?: continue
+            val fqName = resolvedName.fqName?.asString() ?: continue
 
             // checks taken from com.intellij.codeInspection.util.SpecialAnnotationsUtilBase.createAddToSpecialAnnotationFixes
             if (fqName.startsWith("kotlin.")
